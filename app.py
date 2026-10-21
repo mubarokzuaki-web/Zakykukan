@@ -43,11 +43,16 @@ class LiquidityVacuumBot:
         self.imbalance = 0.0
         self.total_pnl = 0.0
 
-    def add_log(self, message, level="INFO"):
-        waktu = datetime.now().strftime("%H:%M:%S")
-        self.logs.insert(0, {"Waktu": waktu, "Level": level, "Pesan": message})
-        if len(self.logs) > 100:
-            self.logs.pop()
+    # --- PENGAMAN LOG DATAFRAME ---
+try:
+    if hasattr(bot, 'logs') and bot.logs:
+        df_logs = pd.DataFrame(bot.logs)
+    else:
+        df_logs = pd.DataFrame(columns=["Waktu", "Pesan", "Status"])
+except Exception as e:
+    df_logs = pd.DataFrame([{"Waktu": "-", "Pesan": f"Log error: {str(e)}", "Status": "INFO"}])
+
+st.dataframe(df_logs, use_container_width=True)
 
     def start(self, api_key, api_secret, symbol, amount_usdt, tp, sl, threshold, paper_trading, use_testnet):
         if self.is_running:
