@@ -1,7 +1,6 @@
 import streamlit as st
-import ccxt
 import pandas as pd
-import time
+import requests
 from datetime import datetime
 
 # --- CONFIG & INITIALIZATION ---
@@ -22,6 +21,22 @@ def add_log(message, status="INFO"):
         "Status": status
     })
 
+def get_binance_ticker_public(symbol_pair):
+    """Mengambil harga ticker Binance melalui REST API Publik (Bypass US IP Block)"""
+    formatted_symbol = symbol_pair.replace("/", "")
+    url = f"https://api.binance.com/api/v3/ticker/price?symbol={formatted_symbol}"
+    
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    }
+    
+    response = requests.get(url, headers=headers, timeout=5)
+    if response.status_code == 200:
+        data = response.json()
+        return float(data['price'])
+    else:
+        raise Exception(f"HTTP Error {response.status_code}: {response.text}")
+
 # --- SIDEBAR CONTROL PANEL ---
 st.sidebar.title("⚙️ Pengaturan Bot")
 
@@ -31,7 +46,7 @@ api_key = st.sidebar.text_input("Binance API Key", type="password", disabled=pap
 api_secret = st.sidebar.text_input("Binance API Secret", type="password", disabled=paper_trading)
 
 st.sidebar.subheader("2. Pasangan Koin & Modal")
-symbol = st.sidebar.selectbox("Pasangan Koin Spot", ["BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT"])
+symbol = st.sidebar.selectbox("Pasangan Koin Spot", ["BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "VIRTUAL/USDT"])
 trade_amount = st.sidebar.number_input("Modal per Order (USDT)", min_value=10.0, value=25.0, step=5.0)
 
 st.sidebar.subheader("3. Parameter AI Scalper")
@@ -71,18 +86,13 @@ if st.session_state.bot_active:
     st.info(f"🔍 System Active: Memindai Order Book & Flash Dip pada pair **{symbol}**...")
     
     try:
-        exchange = ccxt.binance({'enableRateLimit': True})
-        ticker = exchange.fetch_ticker(symbol)
-        current_price = ticker['last']
-        
-        st.write(f"📈 Harga Saat Ini ({symbol}): **${current_price:,.2f}**")
-        
-        # Logika Sederhana Simulasi Signal Vacuum
-        add_log(f"Harga terkini {symbol}: ${current_price:,.2f}. Memindai kedalaman likuiditas...", "SCAN")
+        current_price = get_binance_ticker_public(symbol)
+        st.success(f"📈 Real-Time Price ({symbol}): **${current_price:,.4f}**")
+        add_log(f"Harga terkini {symbol}: ${current_price:,.4f}. Memindai kedalaman likuiditas...", "SCAN")
     except Exception as e:
-        add_log(f"Gagal mengambil data dari Binance: {str(e)}", "ERROR")
+        add_log(f"Gagal mengambil data dari Binance REST: {str(e)}", "ERROR")
 
-# --- LIVE EVENT LOG DISPLAY (SAFE LOG HANDLER) ---
+# --- LIVE EVENT LOG DISPLAY ---
 st.subheader("📜 Live Event & Signal Log")
 
 try:
