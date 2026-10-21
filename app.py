@@ -21,21 +21,26 @@ def add_log(message, status="INFO"):
         "Status": status
     })
 
-def get_binance_ticker_public(symbol_pair):
-    """Mengambil harga ticker Binance melalui REST API Publik (Bypass US IP Block)"""
-    formatted_symbol = symbol_pair.replace("/", "")
-    url = f"https://api.binance.com/api/v3/ticker/price?symbol={formatted_symbol}"
-    
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+def get_crypto_price(symbol_pair):
+    """Mengambil harga real-time via Coingecko API (Bypass Cloud Geo-Block Error 451)"""
+    mapping = {
+        "BTC/USDT": "bitcoin",
+        "ETH/USDT": "ethereum",
+        "SOL/USDT": "solana",
+        "BNB/USDT": "binancecoin",
+        "VIRTUAL/USDT": "virtuals-protocol"
     }
+    coin_id = mapping.get(symbol_pair, "bitcoin")
+    url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd"
     
+    headers = {'User-Agent': 'Mozilla/5.0'}
     response = requests.get(url, headers=headers, timeout=5)
+    
     if response.status_code == 200:
         data = response.json()
-        return float(data['price'])
+        return float(data[coin_id]['usd'])
     else:
-        raise Exception(f"HTTP Error {response.status_code}: {response.text}")
+        raise Exception(f"API Error Status {response.status_code}")
 
 # --- SIDEBAR CONTROL PANEL ---
 st.sidebar.title("⚙️ Pengaturan Bot")
@@ -86,11 +91,11 @@ if st.session_state.bot_active:
     st.info(f"🔍 System Active: Memindai Order Book & Flash Dip pada pair **{symbol}**...")
     
     try:
-        current_price = get_binance_ticker_public(symbol)
-        st.success(f"📈 Real-Time Price ({symbol}): **${current_price:,.4f}**")
-        add_log(f"Harga terkini {symbol}: ${current_price:,.4f}. Memindai kedalaman likuiditas...", "SCAN")
+        current_price = get_crypto_price(symbol)
+        st.success(f"📈 Real-Time Market Price ({symbol}): **${current_price:,.4f}**")
+        add_log(f"Berhasil memindai {symbol}: Harga pasar terkini ${current_price:,.4f}.", "SCAN")
     except Exception as e:
-        add_log(f"Gagal mengambil data dari Binance REST: {str(e)}", "ERROR")
+        add_log(f"Gagal mengambil data harga: {str(e)}", "ERROR")
 
 # --- LIVE EVENT LOG DISPLAY ---
 st.subheader("📜 Live Event & Signal Log")
